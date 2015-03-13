@@ -23,7 +23,7 @@ var MESSAGE_SCHEMA = {
         },
         CastingApplication: {
             type: 'string',
-            "enum" : ['youtube', 'DisplayText', 'Url' , 'Media', 'CustomApp' ] ,
+            "enum": ['youtube', 'DisplayText', 'Url', 'Media', 'CustomApp'],
             required: true
         },
         youtubeUrl: {
@@ -54,7 +54,7 @@ var MESSAGE_SCHEMA = {
             type: 'string',
             required: true
         }
-    } 
+    }
 };
 
 var OPTIONS_SCHEMA = {
@@ -74,16 +74,16 @@ var OPTIONS_SCHEMA = {
 
 
 
-function Plugin(){
-  this.options = {};
-  this.messageSchema = MESSAGE_SCHEMA;
-  this.optionsSchema = OPTIONS_SCHEMA;
-  return this;
+function Plugin() {
+    this.options = {};
+    this.messageSchema = MESSAGE_SCHEMA;
+    this.optionsSchema = OPTIONS_SCHEMA;
+    return this;
 }
 util.inherits(Plugin, EventEmitter);
 
 Plugin.prototype.onMessage = function (message) {
-    
+
     var self = this;
     var _message = null;
 
@@ -92,38 +92,38 @@ Plugin.prototype.onMessage = function (message) {
     else if (message.hasOwnProperty("payload"))
         _message = message.payload;
 
-   // if (this.chromecastFound == false)
-        this.DetectChromecast(_message);
-   // else
-   //     this.ondeviceup(GlobalIP, message);
-  
+    // if (this.chromecastFound == false)
+    this.DetectChromecast(_message);
+    // else
+    //     this.ondeviceup(GlobalIP, message);
+
 };
 
 
-							  
-Plugin.prototype.onConfig = function(device){
-  this.setOptions(device.options||{});
+
+Plugin.prototype.onConfig = function (device) {
+    this.setOptions(device.options || {});
 };
 
-Plugin.prototype.setOptions = function (options){
+Plugin.prototype.setOptions = function (options) {
     this.options = options || {};
     //this.DetectChromecast(options);
 };
 
 Plugin.prototype.DetectChromecast = function (message) {
-      
+
     this.chromecastFound = false;
     var _self = this;
     var HostIP;
     var _msg = message;
-    
-    
+
+
     /**
      * Google Chromecast uses mdns Service named googlecast as advertisement.
      * 
      **/
     var browser = mdns.createBrowser(mdns.tcp('googlecast')).on('serviceUp', function (service) {
-        
+
         if (message) {
 
             if ((message.AutoDiscovery == false) && (message.ChromecastName)) {
@@ -135,7 +135,7 @@ Plugin.prototype.DetectChromecast = function (message) {
                     _self.ondeviceup(HostIP, _msg);
                 }
             }
-            else if ((message.AutoDiscovery == true) && (_self.chromecastFound == false)) {
+            else if (message.AutoDiscovery == true) {
                 if (service.hasOwnProperty("name")) {
                     HostIP = service.addresses[0];
                     GlobalIP = service.addresses[0];
@@ -153,58 +153,63 @@ Plugin.prototype.DetectChromecast = function (message) {
 
 
 Plugin.prototype.ondeviceup = function (host, message) {
-    
+
     var APPID = this.GetChromecastApplicationID(message);
     var client = new Client();
     var _self = this;
-    
+
 
     client.connect(host, function () {
         // Google Chromecast various namespace handlers for initializing connection.
         var connection = client.createChannel('sender-0', 'receiver-0', 'urn:x-cast:com.google.cast.tp.connection', 'JSON');
         var heartbeat = client.createChannel('sender-0', 'receiver-0', 'urn:x-cast:com.google.cast.tp.heartbeat', 'JSON');
         var receiver = client.createChannel('sender-0', 'receiver-0', 'urn:x-cast:com.google.cast.receiver', 'JSON');
-        
-        
+
+
         var requestId = 1443;
         var _transportId;
         var launchRequestId;
-        
-        
+
+
         // establish virtual connection to the receiver
         connection.send({ type: 'CONNECT' });
-        
-        
+
+
         // Check first if the app is avaliable.
         receiver.send({ type: 'GET_APP_AVAILABILITY', appId: [APPID], requestId: requestId });
-        
-        
+
+
         // start heartbeating
         setInterval(function () {
             heartbeat.send({ type: 'PING' });
         }, 5000);
-        
-        
+
+
         receiver.on('message', function (data, broadcast) {
-            
+
             if (data.type = 'RECEIVER_STATUS') {
                 if (data.requestId == requestId) {
                     if ('APP_AVAILABLE' === data.availability[APPID]) {
+                        console.log(data);
                         launchRequestId = requestId;
                         receiver.send({ type: 'LAUNCH', appId: APPID, requestId: requestId++ });
                     }
                 }
                 else if (data.requestId == launchRequestId) {
                     {
+                        console.log('Handling LAUNCH response...');
                         data.status.applications.forEach(function (app) {
                             if (APPID === app.appId) {
+                                console.log(app);
                                 _transportId = app.transportId;
+                                console.log('Discovered transportId: ' + _transportId);
                                 var mySenderConnection = client.createChannel('client-13243', app.transportId, 'urn:x-cast:com.google.cast.tp.connection', 'JSON');
                                 mySenderConnection.send({ type: 'CONNECT' });
                                 _self.ShootChromecastAppSpecficMessage(message, app, client);
                             }
                         });
                     }
+                    console.log(data.status);
                 }
             }
         });
@@ -213,6 +218,7 @@ Plugin.prototype.ondeviceup = function (host, message) {
 }
 
 Plugin.prototype.GetChromecastApplicationID = function (message) {
+    console.log(message);
     if (message.hasOwnProperty('CastingApplication')) {
         switch (message.CastingApplication) {
             case 'youtube':
@@ -227,7 +233,7 @@ Plugin.prototype.GetChromecastApplicationID = function (message) {
                 return message.AppID;
         }
     }
- 
+
 }
 
 Plugin.prototype.GetChromecastAppNamespace = function (message) {
@@ -245,13 +251,13 @@ Plugin.prototype.GetChromecastAppNamespace = function (message) {
                 return message.urn;
         }
     }
- 
+
 }
 
 Plugin.prototype.ShootChromecastAppSpecficMessage = function (message, app, client) {
-    
+
     var namespace = this.GetChromecastAppNamespace(message);
-    
+
     if (message.hasOwnProperty('CastingApplication')) {
         switch (message.CastingApplication) {
             case 'youtube':
@@ -287,16 +293,16 @@ Plugin.prototype.ShootChromecastAppSpecficMessage = function (message, app, clie
                 if (message.hasOwnProperty('MediaURL')) {
                     var url = client.createChannel('client-13243', app.transportId, namespace, 'JSON');
                     url.send({
-                        type: 'LOAD', 
-                        requestId: 77063063, 
-                        sessionId: app.sessionId, 
+                        type: 'LOAD',
+                        requestId: 77063063,
+                        sessionId: app.sessionId,
                         media: {
-                            contentId: message.MediaURL, 
-                            streamType: 'LIVE', 
+                            contentId: message.MediaURL,
+                            streamType: 'LIVE',
                             contentType: 'video/mp4'
-                        }, 
-                        autoplay: true, 
-                        currentTime: 0, 
+                        },
+                        autoplay: true,
+                        currentTime: 0,
                         customData: {
                             payload: {
                                 title: 'Triggred from Octoblu'
@@ -306,15 +312,15 @@ Plugin.prototype.ShootChromecastAppSpecficMessage = function (message, app, clie
                 }
                 break;
             case 'CustomApp':
-            //FIXME
+                //FIXME
         }
     }
- 
+
 }
 
 
 module.exports = {
-  messageSchema: MESSAGE_SCHEMA,
-  optionsSchema: OPTIONS_SCHEMA,
-  Plugin: Plugin
+    messageSchema: MESSAGE_SCHEMA,
+    optionsSchema: OPTIONS_SCHEMA,
+    Plugin: Plugin
 };
