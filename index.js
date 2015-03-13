@@ -124,8 +124,6 @@ Plugin.prototype.DetectChromecast = function (message) {
      **/
     var browser = mdns.createBrowser(mdns.tcp('googlecast')).on('serviceUp', function (service) {
         
-        console.log(service);
-
         if (message) {
 
             if ((message.AutoDiscovery == false) && (message.ChromecastName)) {
@@ -192,26 +190,21 @@ Plugin.prototype.ondeviceup = function (host, message) {
             if (data.type = 'RECEIVER_STATUS') {
                 if (data.requestId == requestId) {
                     if ('APP_AVAILABLE' === data.availability[APPID]) {
-                        console.log(data);
                         launchRequestId = requestId;
                         receiver.send({ type: 'LAUNCH', appId: APPID, requestId: requestId++ });
                     }
                 }
                 else if (data.requestId == launchRequestId) {
                     {
-                        console.log('Handling LAUNCH response...');
                         data.status.applications.forEach(function (app) {
                             if (APPID === app.appId) {
-                                console.log(app);
                                 _transportId = app.transportId;
-                                console.log('Discovered transportId: ' + _transportId);
                                 var mySenderConnection = client.createChannel('client-13243', app.transportId, 'urn:x-cast:com.google.cast.tp.connection', 'JSON');
                                 mySenderConnection.send({ type: 'CONNECT' });
                                 _self.ShootChromecastAppSpecficMessage(message, app, client);
                             }
                         });
                     }
-                    console.log(data.status);
                 }
             }
         });
@@ -220,7 +213,6 @@ Plugin.prototype.ondeviceup = function (host, message) {
 }
 
 Plugin.prototype.GetChromecastApplicationID = function (message) {
-    console.log(message);
     if (message.hasOwnProperty('CastingApplication')) {
         switch (message.CastingApplication) {
             case 'youtube':
@@ -285,7 +277,7 @@ Plugin.prototype.ShootChromecastAppSpecficMessage = function (message, app, clie
                 break;
 
             case 'Url':
-                if (message.hasOwnProperty('MeetingID')) {
+                if (message.hasOwnProperty('Url')) {
                     var url = client.createChannel('client-13243', app.transportId, namespace);
                     url.send(message.Url);
                 }
