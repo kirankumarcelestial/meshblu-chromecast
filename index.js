@@ -87,11 +87,16 @@ Plugin.prototype.onMessage = function (message) {
     var self = this;
     var _message = null;
 
-    if (message.hasOwnProperty("params"))
-        _message = message.params;
-    else if (message.hasOwnProperty("payload"))
+    if (message.hasOwnProperty("payload"))
         _message = message.payload;
-
+	
+    if (message.hasOwnProperty("params") === true)
+	{
+		if(message.params.hasOwnProperty("AutoDiscovery") === true)
+		{
+			_message = message.params;
+		}
+	}
     // if (this.chromecastFound == false)
     this.DetectChromecast(_message);
     // else
